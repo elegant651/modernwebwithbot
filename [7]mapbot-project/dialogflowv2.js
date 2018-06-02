@@ -1,6 +1,6 @@
 module.exports = function(app) {
 
-	const request = require('request');		
+	const request = require('request');
 	const admin = require("firebase-admin");
 	const serviceAccount = require("[어드민 SDK JSON 패스]");
 
@@ -8,8 +8,15 @@ module.exports = function(app) {
 	  credential: admin.credential.cert(serviceAccount),
 	  databaseURL: "https://ghbot-762ee.firebaseio.com/"
 	});	
-
-	const TOKEN = '[dialogflow v1 Token]';
+		
+	const projectId = 'ghbot-762ee'; //https://dialogflow.com/docs/agents#settings
+	const sessionId = 'my-session-id';
+	const languageCode = 'en-US';
+		
+	const dialogflow = require('dialogflow');
+	const sessionClient = new dialogflow.SessionsClient();
+	
+	const sessionPath = sessionClient.sessionPath(projectId, sessionId);
 
 	app.post('/process', (req, res) => {		
 	  	const query = req.body.query;
@@ -19,28 +26,33 @@ module.exports = function(app) {
 	  		return;
 	  	}	  	
 
-	  	const session_id = 'my_session_id';
-	  	const language = 'en'
+	  	// The text query request.
+		const textReq = {
+		  session: sessionPath,
+		  queryInput: {
+		    text: {
+		      text: query,
+		      languageCode: languageCode,
+		    },
+		  },
+		};
 
-	  	const api_url = `https://api.dialogflow.com/v1/query?v=20170712&lang=${language}&sessionId=${session_id}&query=${query}`	  	
 
-		const options = {
-		    url: encodeURI(api_url),		    
-		    headers: {
-		    	'Authorization': "Bearer "+TOKEN,
-		    	'Content-Type': 'application/x-www-form-urlencoded'
-		    }		    
-	    };
-	    request.get(options, function (error, response, body) {
-	     if (!error) {			     		     	
-	     	const objResult = JSON.parse(body);
+	  	// Send request and log result
+		sessionClient
+		  .detectIntent(textReq)
+		  .then(responses => {
+		    console.log('Detected intent');
+		    const result = responses[0].queryResult;
+		    console.log(`  Query: ${result.queryText}`);
+		    console.log(`  Response: ${result.fulfillmentText}`);
+		    if (result.intent) {	   		      
+		      console.log(`  Intent: ${result.intent.displayName}`);
+		      const intent_name = result.intent.displayName;
 
-	     	const intentName = objResult.result.metadata.intentName;
-
-	     	if(intentName=='near_location'){
-	     		const location = objResult.result.parameters.location["street-address"];	     		
-
-	     		getGeocode(location).then((data) => {
+		      if(intent_name=='near_location'){
+		      	const location = result.parameters.fields.location.structValue.fields["street-address"].stringValue;		      	
+		      	getGeocode(location).then((data) => {
 			      	const jsonObj = JSON.parse(data);			      	
 
 		      		res.json({flag: 1, type: 0, data: jsonObj.results[0].geometry.location});
@@ -48,30 +60,30 @@ module.exports = function(app) {
 		      		console.error(err);
 		      		res.json({flag: 0});
 		      	});
-
-	     	} else if(intentName=='find_location'){
-	     		const ghname = objResult.result.parameters.gh_name;
-
-	     		findGhInfo(ghname).then((data) => {
+		      } else if(intent_name=='find_location'){
+		      	const ghname = result.parameters.fields.gh_name.stringValue;
+		      	findGhInfo(ghname).then((data) => {
 
 		      		res.json({flag: 1, type: 1, data: data})
 		      	}).catch((err) =>{
 		      		console.error(err);
 		      		res.json({flag: 0});
 		      	});		      	
-	     	} else {
-	     		console.log(`  No intent matched.`);
-		      	res.json({flag: 0});
-	     	}	     	
-	       	
-	     } else {
-	       console.error('error:', err);
-	       res.json({flag: 0});
-	     }
-	    });  	
+		      }
+		      
+		    } else {
+		      console.log(`  No intent matched.`);
+		      res.json({flag: 0});
+		    }
+		  })
+		  .catch(err => {
+		    console.error('error:', err);
+		    res.json({flag: 0});
+	  	  });
 
-	});
+	  });
 
+	  
 	function getGeocode(addr){
 		return new Promise((resolve, reject) => {
 			const address = encodeURI(addr);

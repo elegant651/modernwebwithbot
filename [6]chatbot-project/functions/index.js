@@ -19,6 +19,11 @@ exports.assistant = functions.https
 	  const info = assistant.getArgument('info');
 	  const speakers = assistant.getArgument('speakers');
 
+	  const ticket = assistant.getArgument('ticket');
+	  const price = assistant.getArgument('price');
+	  const discount = assistant.getArgument('discount');
+	  const payment = assistant.getArgument('payment');
+
 	  let message,	      
 	      statements = [];
 
@@ -26,7 +31,7 @@ exports.assistant = functions.https
 	    onSuccess: function(data) {	      
 
 	      if(location && location.length>0){
-	      	statements.push("행사 주소는 "+data.info.location + " 입니다.");
+	      	statements.push("행사 주소는 "+data.info.location + " 입니다.");	      	
 	      }
 
 	      if(time && time.length>0) {
@@ -39,6 +44,22 @@ exports.assistant = functions.https
 
 	      if(speakers && speakers.length>0){
 	      	statements.push("행사 스피커 리스트는 "+data.info.speakers + " 입니다.");
+	      }
+
+	      if(ticket && ticket.length>0){
+	      	statements.push("티켓 정보에 대해 알려드릴게요.");
+	      }
+
+	      if(price && price.length>0){
+	      	statements.push("티켓 가격은 "+data.info.price + " 입니다.");
+	      }
+
+	      if(discount && discount.length>0){
+	      	statements.push("할인 정보 : "+data.info.discount);
+	      }
+
+	      if(payment && payment.length>0){
+	      	statements.push("결제 정보 : "+data.info.payment);
 	      }
 
 		  message = statements.join(" ");	      
